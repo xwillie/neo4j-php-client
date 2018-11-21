@@ -5,6 +5,12 @@ namespace GraphAware\Neo4j\Client\Tests\Issues;
 use GraphAware\Neo4j\Client\ClientBuilder;
 use GraphAware\Neo4j\Client\Tests\Integration\IntegrationTestCase;
 
+/**
+ * Class Issue143Test
+ * @package GraphAware\Neo4j\Client\Tests\Issues
+ *
+ * @group t143
+ */
 class Issue143Test extends IntegrationTestCase
 {
     public function setUp()
@@ -21,7 +27,7 @@ class Issue143Test extends IntegrationTestCase
 
     protected function getAdditionalConnections()
     {
-        return ['non-exist', 'bolt://error:7687'];
+        return ['non-exist' => 'bolt://error:7687'];
     }
 
 
