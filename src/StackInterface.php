@@ -34,6 +34,13 @@ interface StackInterface
     public function push($query, $parameters = null, $tag = null);
 
     /**
+     * @param string     $query
+     * @param null|array $parameters
+     * @param null|array $tag
+     */
+    public function pushWrite($query, $parameters = null, $tag = null);
+
+    /**
      * @param $query
      * @param array|null $parameters
      * @param array|null $tag
@@ -69,4 +76,9 @@ interface StackInterface
      * @return null|string
      */
     public function getConnectionAlias();
+
+    /**
+     * @return bool
+     */
+    public function hasWrites();
 }

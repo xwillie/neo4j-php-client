@@ -132,7 +132,7 @@ class Client implements ClientInterface
      */
     public function runStack(StackInterface $stack)
     {
-        $connectionAlias = $stack instanceof Stack && $stack->hasWrites()
+        $connectionAlias = $stack->hasWrites()
             ? $this->connectionManager->getMasterConnection()->getAlias()
             : $stack->getConnectionAlias();
         $pipeline = $this->pipeline(null, null, $stack->getTag(), $connectionAlias);
