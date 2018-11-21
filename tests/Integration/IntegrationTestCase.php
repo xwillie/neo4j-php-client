@@ -22,6 +22,16 @@ class IntegrationTestCase extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
+        $connections = array_merge($this->getConnections(), $this->getAdditionalConnections());
+
+        $this->client = ClientBuilder::create()
+            ->addConnection('http', $connections['http'])
+            ->addConnection('bolt', $connections['bolt'])
+            ->build();
+    }
+
+    protected function getConnections()
+    {
         $httpUri = 'http://localhost:7474';
         if (isset($_ENV['NEO4J_USER'])) {
             $httpUri = sprintf(
@@ -44,10 +54,15 @@ class IntegrationTestCase extends \PHPUnit_Framework_TestCase
             );
         }
 
-        $this->client = ClientBuilder::create()
-            ->addConnection('http', $httpUri)
-            ->addConnection('bolt', $boltUrl)
-            ->build();
+        return [
+            'http' => $httpUri,
+            'bolt' => $boltUrl
+        ];
+    }
+
+    protected function getAdditionalConnections()
+    {
+        return [];
     }
 
     /**

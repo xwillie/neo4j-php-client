@@ -36,6 +36,11 @@ class Stack implements StackInterface
     protected $preflights = [];
 
     /**
+     * @var bool
+     */
+    protected $hasWrites = false;
+
+    /**
      * @param null        $tag
      * @param null|string $connectionAlias
      */
@@ -65,6 +70,18 @@ class Stack implements StackInterface
     {
         $params = null !== $parameters ? $parameters : [];
         $this->statements[] = Statement::create($query, $params, $tag);
+    }
+
+    /**
+     * @param string $query
+     * @param null|array $parameters
+     * @param null|array $tag
+     */
+    public function pushWrite($query, $parameters = null, $tag = null)
+    {
+        $params = null !== $parameters ? $parameters : [];
+        $this->statements[] = Statement::create($query, $params, $tag);
+        $this->hasWrites = true;
     }
 
     /**
@@ -124,5 +141,13 @@ class Stack implements StackInterface
     public function getConnectionAlias()
     {
         return $this->connectionAlias;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasWrites()
+    {
+        return $this->hasWrites;
     }
 }
