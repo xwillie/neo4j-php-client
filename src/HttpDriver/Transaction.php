@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,11 +8,13 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client\HttpDriver;
 
+use GraphAware\Common\Cypher\Statement;
 use GraphAware\Common\Transaction\TransactionInterface;
 use GraphAware\Neo4j\Client\Exception\Neo4jException;
-use GraphAware\Common\Cypher\Statement;
+use GraphAware\Neo4j\Client\Exception\Neo4jExceptionInterface;
 
 class Transaction implements TransactionInterface
 {
@@ -40,6 +42,8 @@ class Transaction implements TransactionInterface
     protected $transactionId;
 
     protected $expires;
+
+    protected $pending = [];
 
     /**
      * @param Session $session
@@ -106,9 +110,8 @@ class Transaction implements TransactionInterface
     /**
      * {@inheritdoc}
      */
-    public function push($query, array $parameters = array(), $tag = null)
+    public function push($query, array $parameters = [], $tag = null)
     {
-        //
     }
 
     public function getStatus()
@@ -133,15 +136,15 @@ class Transaction implements TransactionInterface
     /**
      * @param Statement $statement
      *
-     * @return \GraphAware\Common\Result\RecordCursorInterface
-     *
      * @throws Neo4jException
+     *
+     * @return \GraphAware\Common\Result\RecordCursorInterface
      */
     public function run(Statement $statement)
     {
         $this->assertStarted();
         try {
-            $results = $this->session->pushToTransaction($this->transactionId, array($statement));
+            $results = $this->session->pushToTransaction($this->transactionId, [$statement]);
 
             return $results->results()[0];
         } catch (Neo4jException $e) {
@@ -157,9 +160,9 @@ class Transaction implements TransactionInterface
     /**
      * @param array $statements
      *
-     * @return \GraphAware\Common\Result\ResultCollection
-     *
      * @throws Neo4jException
+     *
+     * @return \GraphAware\Common\Result\ResultCollection
      */
     public function runMultiple(array $statements)
     {
@@ -179,7 +182,15 @@ class Transaction implements TransactionInterface
     {
         $this->assertNotClosed();
         $this->assertStarted();
-        $this->session->commitTransaction($this->transactionId);
+        try {
+            $this->session->commitTransaction($this->transactionId);
+        } catch (Neo4jException $e) {
+            if ($e->effect() === Neo4jExceptionInterface::EFFECT_ROLLBACK) {
+                $this->state = self::ROLLED_BACK;
+            }
+
+            throw $e;
+        }
         $this->state = self::COMMITED;
         $this->closed = true;
         $this->session->transaction = null;
@@ -194,6 +205,7 @@ class Transaction implements TransactionInterface
     {
         if ($this->state !== self::OPENED) {
             throw new \RuntimeException('This transaction has not been started');
+            //$this->begin();
         }
     }
 

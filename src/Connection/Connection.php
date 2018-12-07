@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,16 +8,18 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client\Connection;
 
-use GraphAware\Bolt\Configuration;
+use GraphAware\Bolt\Configuration as BoltConfiguration;
+use GraphAware\Bolt\Driver as BoltDriver;
+use GraphAware\Bolt\Exception\MessageFailureException;
 use GraphAware\Bolt\GraphDatabase as BoltGraphDB;
+use GraphAware\Common\Connection\BaseConfiguration;
 use GraphAware\Common\Cypher\Statement;
 use GraphAware\Neo4j\Client\Exception\Neo4jException;
-use GraphAware\Bolt\Exception\MessageFailureException;
 use GraphAware\Neo4j\Client\HttpDriver\GraphDatabase as HttpGraphDB;
-use GraphAware\Neo4j\Client\Stack;
-use GraphAware\Neo4j\Client\HttpDriver\Configuration as HttpConfig;
+use GraphAware\Neo4j\Client\StackInterface;
 
 class Connection
 {
@@ -37,28 +39,27 @@ class Connection
     private $driver;
 
     /**
+     * @var array
+     */
+    private $config;
+
+    /**
      * @var \GraphAware\Common\Driver\SessionInterface
      */
     private $session;
 
     /**
-     * @var int
-     */
-    private $timeout;
-
-    /**
      * Connection constructor.
      *
-     * @param string $alias
-     * @param string $uri
-     * @param null   $config
-     * @param int    $timeout
+     * @param string                 $alias
+     * @param string                 $uri
+     * @param BaseConfiguration|null $config
      */
-    public function __construct($alias, $uri, $config = null, $timeout)
+    public function __construct($alias, $uri, $config = null)
     {
         $this->alias = (string) $alias;
         $this->uri = (string) $uri;
-        $this->timeout = (int) $timeout;
+        $this->config = $config;
 
         $this->buildDriver();
     }
@@ -84,12 +85,12 @@ class Connection
      * @param array $parameters
      * @param null  $tag
      *
-     * @return \GraphAware\Bolt\Protocol\Pipeline|\GraphAware\Neo4j\Client\HttpDriver\Pipeline
+     * @return \GraphAware\Common\Driver\PipelineInterface
      */
-    public function createPipeline($query = null, $parameters = array(), $tag = null)
+    public function createPipeline($query = null, $parameters = [], $tag = null)
     {
         $this->checkSession();
-        $parameters = is_array($parameters) ? $parameters : array();
+        $parameters = is_array($parameters) ? $parameters : [];
 
         return $this->session->createPipeline($query, $parameters, $tag);
     }
@@ -99,19 +100,21 @@ class Connection
      * @param array|null  $parameters
      * @param null|string $tag
      *
-     * @return \GraphAware\Common\Result\AbstractRecordCursor
-     *
      * @throws Neo4jException
+     *
+     * @return \GraphAware\Common\Result\Result
      */
-    public function run($statement, $parameters = null, $tag)
+    public function run($statement, $parameters = null, $tag = null)
     {
         $this->checkSession();
+        if (empty($statement)) {
+            throw new \InvalidArgumentException(sprintf('Expected a non-empty Cypher statement, got "%s"', $statement));
+        }
         $parameters = (array) $parameters;
 
         try {
-            $results = $this->session->run($statement, $parameters, $tag);
-
-            return $results;
+            $result = $this->session->run($statement, $parameters, $tag);
+            return $result;
         } catch (MessageFailureException $e) {
             $exception = new Neo4jException($e->getMessage());
             $exception->setNeo4jStatusCode($e->getStatusCode());
@@ -131,7 +134,7 @@ class Connection
         $pipeline = $this->createPipeline();
 
         foreach ($queue as $element) {
-            if ($element instanceof Stack) {
+            if ($element instanceof StackInterface) {
                 foreach ($element->statements() as $statement) {
                     $pipeline->push($statement->text(), $statement->parameters(), $statement->getTag());
                 }
@@ -168,16 +171,16 @@ class Connection
         $params = parse_url($this->uri);
 
         if (preg_match('/bolt/', $this->uri)) {
-            $port = isset($params['port']) ? (int) $params['port'] : 7687;
+            $port = isset($params['port']) ? (int) $params['port'] : BoltDriver::DEFAULT_TCP_PORT;
             $uri = sprintf('%s://%s:%d', $params['scheme'], $params['host'], $port);
             $config = null;
             if (isset($params['user']) && isset($params['pass'])) {
-                $config = Configuration::withCredentials($params['user'], $params['pass']);
+                $config = BoltConfiguration::create()->withCredentials($params['user'], $params['pass']);
             }
             $this->driver = BoltGraphDB::driver($uri, $config);
         } elseif (preg_match('/http/', $this->uri)) {
             $uri = $this->uri;
-            $this->driver = HttpGraphDB::driver($uri, HttpConfig::withTimeout($this->timeout));
+            $this->driver = HttpGraphDB::driver($uri, $this->config);
         } else {
             throw new \RuntimeException(sprintf('Unable to build a driver from uri "%s"', $this->uri));
         }

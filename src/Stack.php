@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,11 +8,12 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client;
 
 use GraphAware\Common\Cypher\Statement;
 
-class Stack
+class Stack implements StackInterface
 {
     /**
      * @var null|string
@@ -30,6 +31,16 @@ class Stack
     protected $statements = [];
 
     /**
+     * @var Statement[]
+     */
+    protected $preflights = [];
+
+    /**
+     * @var bool
+     */
+    protected $hasWrites = false;
+
+    /**
      * @param null        $tag
      * @param null|string $connectionAlias
      */
@@ -43,11 +54,11 @@ class Stack
      * @param null|string $tag
      * @param null|string $connectionAlias
      *
-     * @return Stack
+     * @return StackInterface
      */
     public static function create($tag = null, $connectionAlias = null)
     {
-        return new self($tag, $connectionAlias);
+        return new static($tag, $connectionAlias);
     }
 
     /**
@@ -57,8 +68,47 @@ class Stack
      */
     public function push($query, $parameters = null, $tag = null)
     {
-        $params = null !== $parameters ? $parameters : array();
+        $params = null !== $parameters ? $parameters : [];
         $this->statements[] = Statement::create($query, $params, $tag);
+    }
+
+    /**
+     * @param string $query
+     * @param null|array $parameters
+     * @param null|array $tag
+     */
+    public function pushWrite($query, $parameters = null, $tag = null)
+    {
+        $params = null !== $parameters ? $parameters : [];
+        $this->statements[] = Statement::create($query, $params, $tag);
+        $this->hasWrites = true;
+    }
+
+    /**
+     * @param $query
+     * @param array|null $parameters
+     * @param array|null $tag
+     */
+    public function addPreflight($query, $parameters = null, $tag = null)
+    {
+        $params = null !== $parameters ? $parameters : [];
+        $this->preflights[] = Statement::create($query, $params, $tag);
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasPreflights()
+    {
+        return !empty($this->preflights);
+    }
+
+    /**
+     * @return \GraphAware\Common\Cypher\Statement[]
+     */
+    public function getPreflights()
+    {
+        return $this->preflights;
     }
 
     /**
@@ -91,5 +141,13 @@ class Stack
     public function getConnectionAlias()
     {
         return $this->connectionAlias;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasWrites()
+    {
+        return $this->hasWrites;
     }
 }

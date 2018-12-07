@@ -3,7 +3,7 @@
 /*
  * This file is part of the GraphAware Neo4j Client package.
  *
- * (c) Graph Aware Limited <http://graphaware.com>
+ * (c) GraphAware Limited <http://graphaware.com>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -78,13 +78,13 @@ class RecordView implements RecordViewInterface
      *
      * @param string $key
      *
-     * @return \GraphAware\Neo4j\Client\Formatter\Type\Node
-     *
      * @throws \InvalidArgumentException When the value is not null or instance of Node
+     *
+     * @return \GraphAware\Neo4j\Client\Formatter\Type\Node
      */
     public function nodeValue($key)
     {
-        if (!$this->hasValue($key) || !$this->get($key) instanceof Node) {
+        if (!$this->hasValue($key) || !$this->value($key) instanceof Node) {
             throw new \InvalidArgumentException(sprintf('value for %s is not of type %s', $key, Node::class));
         }
 
@@ -94,13 +94,13 @@ class RecordView implements RecordViewInterface
     /**
      * @param string $key
      *
-     * @return \GraphAware\Neo4j\Client\Formatter\Type\Relationship
-     *
      * @throws \InvalidArgumentException When the value is not null or instance of Relationship
+     *
+     * @return \GraphAware\Neo4j\Client\Formatter\Type\Relationship
      */
     public function relationshipValue($key)
     {
-        if (!isset($this->values[$key]) || !$this->values[$key] instanceof Relationship) {
+        if (!$this->hasValue($key) || !$this->value($key) instanceof Relationship) {
             throw new \InvalidArgumentException(sprintf('value for %s is not of type %s', $key, Relationship::class));
         }
 

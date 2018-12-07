@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,7 +8,10 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client\Connection;
+
+use GraphAware\Common\Connection\BaseConfiguration;
 
 class ConnectionManager
 {
@@ -23,14 +26,13 @@ class ConnectionManager
     private $master;
 
     /**
-     * @param string $alias
-     * @param string $uri
-     * @param null   $config
-     * @param int    $timeout
+     * @param string                 $alias
+     * @param string                 $uri
+     * @param BaseConfiguration|null $config
      */
-    public function registerConnection($alias, $uri, $config = null, $timeout)
+    public function registerConnection($alias, $uri, $config = null)
     {
-        $this->registerExistingConnection($alias, new Connection($alias, $uri, $config, $timeout));
+        $this->registerExistingConnection($alias, new Connection($alias, $uri, $config));
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,11 +8,21 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client\Transaction;
 
+use GraphAware\Bolt\Exception\MessageFailureException;
 use GraphAware\Common\Cypher\Statement;
+use GraphAware\Common\Result\Result;
 use GraphAware\Common\Transaction\TransactionInterface;
-use GraphAware\Neo4j\Client\Stack;
+use GraphAware\Neo4j\Client\Event\FailureEvent;
+use GraphAware\Neo4j\Client\Event\PostRunEvent;
+use GraphAware\Neo4j\Client\Event\PreRunEvent;
+use GraphAware\Neo4j\Client\Exception\Neo4jException;
+use GraphAware\Neo4j\Client\Neo4jClientEvents;
+use GraphAware\Neo4j\Client\Result\ResultCollection;
+use GraphAware\Neo4j\Client\StackInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class Transaction
 {
@@ -27,11 +37,18 @@ class Transaction
     protected $queue = [];
 
     /**
-     * @param TransactionInterface $driverTransaction
+     * @var EventDispatcherInterface
      */
-    public function __construct(TransactionInterface $driverTransaction)
+    protected $eventDispatcher;
+
+    /**
+     * @param TransactionInterface $driverTransaction
+     * @param EventDispatcherInterface $eventDispatcher
+     */
+    public function __construct(TransactionInterface $driverTransaction, EventDispatcherInterface $eventDispatcher)
     {
         $this->driverTransaction = $driverTransaction;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     /**
@@ -41,7 +58,7 @@ class Transaction
      * @param array       $parameters
      * @param string|null $tag
      */
-    public function push($statement, array $parameters = array(), $tag = null)
+    public function push($statement, array $parameters = [], $tag = null)
     {
         $this->queue[] = Statement::create($statement, $parameters, $tag);
     }
@@ -51,35 +68,55 @@ class Transaction
      * @param array       $parameters
      * @param null|string $tag
      *
-     * @return \GraphAware\Common\Result\Result
+     * @throws Neo4jException
+     *
+     * @return \GraphAware\Common\Result\Result|null
      */
-    public function run($statement, array $parameters = array(), $tag = null)
+    public function run($statement, array $parameters = [], $tag = null)
     {
-        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'])) {
+        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'], true)) {
             $this->driverTransaction->begin();
         }
+        $stmt = Statement::create($statement, $parameters, $tag);
+        $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_PRE_RUN, new PreRunEvent([$stmt]));
+        try {
+            $result = $this->driverTransaction->run(Statement::create($statement, $parameters, $tag));
+            $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_POST_RUN, new PostRunEvent(ResultCollection::withResult($result)));
+        } catch (MessageFailureException $e) {
+            $exception = new Neo4jException($e->getMessage());
+            $exception->setNeo4jStatusCode($e->getStatusCode());
 
-        return $this->driverTransaction->run(Statement::create($statement, $parameters, $tag));
+            $event = new FailureEvent($exception);
+            $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_ON_FAILURE, $event);
+            if ($event->shouldThrowException()) {
+                throw $exception;
+            }
+            return null;
+        }
+
+        return $result;
     }
 
     /**
      * Push a statements Stack to the queue, without actually sending it.
      *
-     * @param \GraphAware\Neo4j\Client\Stack $stack
+     * @param \GraphAware\Neo4j\Client\StackInterface $stack
      */
-    public function pushStack(Stack $stack)
+    public function pushStack(StackInterface $stack)
     {
         $this->queue[] = $stack;
     }
 
     /**
-     * @param Stack $stack
+     * @param StackInterface $stack
      *
-     * @return mixed
+     * @throws Neo4jException
+     *
+     * @return ResultCollection|Result[]|null
      */
-    public function runStack(Stack $stack)
+    public function runStack(StackInterface $stack)
     {
-        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'])) {
+        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'], true)) {
             $this->driverTransaction->begin();
         }
 
@@ -89,7 +126,23 @@ class Transaction
             $sts[] = $statement;
         }
 
-        return $this->driverTransaction->runMultiple($sts);
+        $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_PRE_RUN, new PreRunEvent($stack->statements()));
+        try {
+            $results = $this->driverTransaction->runMultiple($sts);
+            $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_POST_RUN, new PostRunEvent($results));
+        } catch (MessageFailureException $e) {
+            $exception = new Neo4jException($e->getMessage());
+            $exception->setNeo4jStatusCode($e->getStatusCode());
+
+            $event = new FailureEvent($exception);
+            $this->eventDispatcher->dispatch(Neo4jClientEvents::NEO4J_ON_FAILURE, $event);
+            if ($event->shouldThrowException()) {
+                throw $exception;
+            }
+            return null;
+        }
+
+        return $results;
     }
 
     public function begin()
@@ -134,13 +187,13 @@ class Transaction
      */
     public function commit()
     {
-        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'])) {
+        if (!$this->driverTransaction->isOpen() && !in_array($this->driverTransaction->status(), ['COMMITED', 'ROLLED_BACK'], true)) {
             $this->driverTransaction->begin();
         }
         if (!empty($this->queue)) {
             $stack = [];
             foreach ($this->queue as $element) {
-                if ($element instanceof Stack) {
+                if ($element instanceof StackInterface) {
                     foreach ($element->statements() as $statement) {
                         $stack[] = $statement;
                     }

@@ -4,12 +4,12 @@
 
 [![Build Status](https://travis-ci.org/graphaware/neo4j-php-client.svg?branch=master)](https://travis-ci.org/graphaware/neo4j-php-client)
 [![Latest Stable Version](https://poser.pugx.org/graphaware/neo4j-php-client/v/stable.svg)](https://packagist.org/packages/graphaware/neo4j-php-client)
-[![Total Downloads](https://poser.pugx.org/neoxygen/neoclient/downloads.svg)](https://packagist.org/packages/neoxygen/neoclient)
-[![License](https://poser.pugx.org/neoxygen/neoclient/license.svg)](https://packagist.org/packages/graphaware/neo4j-php-client)
+[![Total Downloads](https://poser.pugx.org/graphaware/neo4j-php-client/downloads.svg)](https://packagist.org/packages/graphaware/neo4j-php-client)
+[![License](https://poser.pugx.org/graphaware/neo4j-php-client/license.svg)](https://packagist.org/packages/graphaware/neo4j-php-client)
 
 ## Introduction
 
-Neo4j-PHP-Client is the most advanced and flexible [Neo4j](http://neo4j.com) Client for PHP. 
+Neo4j-PHP-Client is the most advanced and flexible [Neo4j](http://neo4j.com) Client for PHP.
 
 ### What is Neo4j?
 
@@ -45,6 +45,8 @@ Neo4j is a transactional, open-source graph database. A graph database manages d
 ### Requirements
 
 * PHP >= 5.6
+* ext-bcmath
+* ext-mbstring
 * A Neo4j database (minimum version 2.2.6)
 
 ### Getting Help
@@ -56,7 +58,7 @@ You can:
 
 ### Implementations
 
-* [Symfony Framework Bundle](https://github.com/PandawanTechnology/Neo4jBundle)
+* [Symfony Framework Bundle](https://github.com/neo4j-contrib/neo4j-symfony)
 
 ## Installation and basic usage
 
@@ -65,7 +67,7 @@ You can:
 Add the library to your composer dependencies :
 
 ```bash
-composer require graphaware/neo4j-php-client
+composer require graphaware/neo4j-php-client:^4.0
 ```
 
 Require the composer autoloader, configure your connection by providing a connection alias and your connection settings :
@@ -92,20 +94,20 @@ NB: The build method will process configuration settings and return you a `Clien
 #### Sending a Cypher Query
 
 ```php
-$client->run("CREATE (n:Person)");
+$client->run('CREATE (n:Person)');
 ```
 
 #### Sending a Cypher Query with parameters
 
 ```php
-$client->run("CREATE (n:Person) SET n += {infos}", ['infos' => ['name' => 'Ales', 'age' => 34]]);
+$client->run('CREATE (n:Person) SET n += {infos}', ['infos' => ['name' => 'Ales', 'age' => 34]]);
 ```
 
 #### Reading a Result
 
 ```php
-$result = $client->run("MATCH (n:Person) RETURN n");
-// a result contains always a collection (array) of Record objects
+$result = $client->run('MATCH (n:Person) RETURN n');
+// a result always contains a collection (array) of Record objects
 
 // get all records
 $records = $result->getRecords();
@@ -118,11 +120,11 @@ $record = $result->getRecord();
 A `Record` object contains the values of one record from your Cypher query :
 
 ```php
-$query = "MATCH (n:Person)-[:FOLLOWS]->(friend) RETURN n.name, collect(friend) as friends";
+$query = 'MATCH (n:Person)-[:FOLLOWS]->(friend) RETURN n.name, collect(friend) as friends';
 $result = $client->run($query);
 
 foreach ($result->getRecords() as $record) {
-    echo sprintf('Person name is : %s and has %d number of friends', $record->value('name'), count($record->value('friends'));
+    echo sprintf('Person name is : %s and has %d number of friends', $record->value('name'), count($record->value('friends')));
 }
 ```
 
@@ -133,7 +135,6 @@ Ideally, you would stack your statements and issue them all at once in order to 
 You can create Cypher statement stacks that act as a Bag and run this stack with the client, example :
 
 ```php
-
 $stack = $client->stack();
 
 $stack->push('CREATE (n:Person {uuid: {uuid} })', ['uuid' => '123-fff']);
@@ -202,11 +203,11 @@ Each record contains one row of values returned by the Cypher query :
 
 ```
 
-$query = "MATCH (n:Person) n, n.name as name, n.age as age";
+$query = 'MATCH (n:Person) n, n.name as name, n.age as age';
 $result = $client->run($query);
 
 foreach ($result->records() as $record) {
-    print_r($record->get('n'); // nodes returned are automatically hydrated to Node objects
+    print_r($record->get('n')); // nodes returned are automatically hydrated to Node objects
 
     echo $record->value('name') . PHP_EOL;
     echo $record->value('age') . PHP_EOL;
@@ -278,9 +279,9 @@ A `Result` is a collection of `Record` objects, every **row** you see in the bro
 In contrary to the previous versions of the client, there is no more automatic merging of all the records into one big record, so you will need to iterate all the records from the `Result` :
 
 ```php
-$query = "MATCH (n:Address)
+$query = 'MATCH (n:Address)
 RETURN n.address as addr, n, collect(id(n)) as ids
-LIMIT 5";
+LIMIT 5';
 $result = $client->run($query);
 
 foreach ($result->records() as $record) {
@@ -347,7 +348,6 @@ The Client provides a Transaction object that ease how you would work with trans
 #### Creating a Transaction
 
 ```php
-
 $tx = $client->transaction();
 ```
 
@@ -356,7 +356,7 @@ At this stage, nothing has been sent to the server yet (the statement BEGIN has 
 #### Stack a query
 
 ```
-$tx->push("CREATE (n:Person) RETURN id(n)");
+$tx->push('CREATE (n:Person) RETURN id(n)');
 ```
 
 Again, until now nothing has been sent.
@@ -366,19 +366,16 @@ Again, until now nothing has been sent.
 Sometimes you want to get an immediate result of a statement inside the transaction, this can be done with the `run` method :
 
 ```php
-
-$result = $tx->run("CREATE (n:Person) SET n.name = {name} RETURN id(n)", ['name' => 'Michal']);
+$result = $tx->run('CREATE (n:Person) SET n.name = {name} RETURN id(n)', ['name' => 'Michal']);
 
 echo $result->getRecord()->value("id(n)");
 ```
 
 If the transaction has not yet begun, the BEGIN of the transaction will be done automatically.
-```
 
 #### You can also push or run Stacks
 
 ```php
-
 $stack = $client->stack();
 $stack->push('CREATE (n:Person {uuid: {uuid} })', ['uuid' => '123-fff']);
 $stack->push('MATCH (n:Person {uuid: {uuid1} }), (n2:Person {uuid: {uuid2} }) MERGE (n)-[:FOLLOWS]->(n2)', ['uuid1' => '123-fff', 'uuid2' => '456-ddd']);
@@ -399,7 +396,7 @@ $stack->push('CREATE (n:Person {uuid: {uuid} })', ['uuid' => '123-fff']);
 $stack->push('MATCH (n:Person {uuid: {uuid1} }), (n2:Person {uuid: {uuid2} }) MERGE (n)-[:FOLLOWS]->(n2)', ['uuid1' => '123-fff', 'uuid2' => '456-ddd']);
 
 $tx->pushStack($stack);
-$tx->pushQuery("MATCH (n) RETURN count(n)");
+$tx->pushQuery('MATCH (n) RETURN count(n)');
 
 $results = $tx->commit();
 ```
@@ -467,7 +464,7 @@ The event dispatcher is available via the client with the `$client->getEventDisp
 
 ### Settings
 
-#### Timeout
+#### Timeout (deprecated)
 
 You can configure a global timeout for the connections :
 
@@ -480,10 +477,46 @@ $client = ClientBuilder::create()
 
 The timeout by default is 5 seconds.
 
+This feature is deprecated and will be removed in version 5. See Http client settings below. 
+
+### TLS
+
+You can enable TLS encryption for the Bolt Protocol by passing a `Configuration` instance when building the connection, here
+is a simple example :
+
+```
+$config = \GraphAware\Bolt\Configuration::newInstance()
+    ->withCredentials('bolttest', 'L7n7SfTSj')
+    ->withTLSMode(\GraphAware\Bolt\Configuration::TLSMODE_REQUIRED);
+
+$client = ClientBuilder::create()
+    ->addConnection('default', 'bolt://hodccomjfkgdenl.dbs.gdb.com:24786', config)
+    ->build();
+```
+
+#### HTTP client settings
+
+We use HTTPlug to give you full control of the HTTP client. Version 4 of the Neo4jClient comes with Guzzle6 by default
+to preserve backward compatibility. Version 5 will give you the option to choose whatever client you want. Read more
+about HTTPlug [in their documentation](http://docs.php-http.org/en/latest/httplug/users.html).
+
+To configure your client you may add it to `Configuration`. Below is an example using `php-http/curl-client`.
+
+```php
+use Http\Client\Curl\Client;
+
+$options = [
+    CURLOPT_CONNECTTIMEOUT => 3, // The number of seconds to wait while trying to connect.
+    CURLOPT_SSL_VERIFYPEER => false // Stop cURL from verifying the peer's certificate
+];
+$httpClient = new Client(null, null, $options);
+
+$config = \GraphAware\Neo4j\Client\HttpDriver\Configuration::create($httpClient);
+$client = ClientBuilder::create()
+    ->addConnection('default', 'http://neo4j:password@localhost:7474', $config)
+    ->build();
+```
+
 ### License
 
 The library is released under the MIT License, refer to the LICENSE file bundled with this package.
-
-
-
-

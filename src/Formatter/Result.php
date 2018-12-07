@@ -1,6 +1,6 @@
 <?php
 
-/**
+/*
  * This file is part of the GraphAware Neo4j Client package.
  *
  * (c) GraphAware Limited <http://graphaware.com>
@@ -8,13 +8,15 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace GraphAware\Neo4j\Client\Formatter;
 
+use GraphAware\Common\Cypher\StatementInterface;
 use GraphAware\Common\Result\AbstractRecordCursor;
+use GraphAware\Common\Result\Record;
 use GraphAware\Neo4j\Client\Formatter\Type\Node;
 use GraphAware\Neo4j\Client\Formatter\Type\Path;
 use GraphAware\Neo4j\Client\Formatter\Type\Relationship;
-use GraphAware\Common\Cypher\StatementInterface;
 use GraphAware\Neo4j\Client\HttpDriver\Result\ResultSummary;
 use GraphAware\Neo4j\Client\HttpDriver\Result\StatementStatistics;
 
@@ -59,7 +61,9 @@ class Result extends AbstractRecordCursor
     }
 
     /**
-     * @return RecordView|null
+     * @throws \RuntimeException When there is no record
+     *
+     * @return RecordView
      */
     public function firstRecord()
     {
@@ -67,7 +71,19 @@ class Result extends AbstractRecordCursor
             return $this->records[0];
         }
 
-        return;
+        throw new \RuntimeException('There is no records');
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function firstRecordOrDefault($default)
+    {
+        if (0 === $this->size()) {
+            return $default;
+        }
+
+        return $this->firstRecord();
     }
 
     /**
@@ -113,11 +129,17 @@ class Result extends AbstractRecordCursor
     }
 
     /**
-     * @return RecordView|null
+     * @throws \RuntimeException When there is no records
+     *
+     * @return RecordView
      */
     public function getRecord()
     {
-        return !empty($this->records) ? $this->records[0] : null;
+        if (!empty($this->records)) {
+            return $this->records[0];
+        }
+
+        throw new \RuntimeException('There is no records');
     }
 
     /**
